@@ -1,0 +1,221 @@
+meta:
+  version: 0.1
+  rules:
+    naming:
+      types: PascalCase singular nouns (e.g. Song, Artist, Album)
+      fields: snake_case
+      refs: |
+        A field that references another type uses a bare name matching the
+        referenced type in snake_case (singular for a single ref, plural for a
+        list of refs). E.g. `album: { ref: Album }`, `artists: list of { ref: Artist }`.
+    storage:
+      root: data/
+      folder_per_type: snake_case plural of the type name (e.g. data/songs/, data/album_tracks/)
+      file_format: markdown with YAML frontmatter; one file per instance
+      instance_id: the filename without `.md` is the instance's id/slug; refs use this slug
+    field_spec:
+      required_keys: [type, description]
+      optional_keys: [required, default, enum, items, ref]
+      primitive_types: [string, integer, float, boolean, date, datetime, duration, url]
+      collection_types: [list, map]
+      ref: name of another type in `types` (for relationships)
+    type_spec:
+      required_keys: [description, fields]
+      optional_keys: [extends, identifiers, examples]
+      identifiers: list of field names that uniquely identify an instance
+    conventions:
+      - Every instance has an implicit `id` derived from its filename — do not declare it in `fields`
+      - Every instance implicitly has the fields defined in `meta.common_fields` — do not redeclare them per type
+      - Prefer `ref` over embedding when the related entity has its own identity
+      - Use ISO 8601 for dates, datetimes, and durations
+      - Add new types alphabetically within `types`
+  common_fields:
+    visibility:
+      type: string
+      enum: [private, public]
+      default: private
+      description: Who can see this instance. `private` is owner-only; `public` is shared. Applies to every type.
+
+types:
+  Album:
+    description: |
+      A conceptual musical release. The album exists as an idea with a fixed set of
+      track slots; Songs fill those slots via AlbumTrack. An album can be defined
+      (with empty or partial slots) before any Songs are written or assigned.
+    identifiers: [upc]
+    fields:
+      title:
+        type: string
+        required: true
+        description: Album title.
+      concept:
+        type: string
+        description: The guiding idea, narrative, or theme of the album.
+      artists:
+        type: list
+        items: { ref: Artist }
+        description: Primary artists credited on the album.
+      upc:
+        type: string
+        description: Universal Product Code (unique identifier for the release).
+      release_date:
+        type: date
+        description: Planned or actual release date.
+      label:
+        type: string
+        description: Record label, if any.
+      tracks:
+        type: list
+        items: { ref: AlbumTrack }
+        description: Ordered list of track slots. Order is defined by AlbumTrack.position.
+      genres:
+        type: list
+        items: { type: string }
+        description: Genre tags.
+
+  AlbumTrack:
+    description: |
+      A slot on an Album. Defines a position and the role a Song plays on this
+      specific release. The slot can exist before a Song is assigned (song is
+      optional), allowing the album to be planned in the abstract.
+    identifiers: [album, position]
+    fields:
+      album:
+        ref: Album
+        required: true
+        description: The album this slot belongs to.
+      position:
+        type: integer
+        required: true
+        description: Track number within the album (1-indexed).
+      side:
+        type: string
+        description: Side designation for multi-sided formats (e.g. "A", "B", "1", "2").
+      song:
+        ref: Song
+        description: The Song filling this slot. May be empty if the slot is reserved but unfilled.
+      track_title:
+        type: string
+        description: Title as it appears on this album, if it differs from Song.title.
+      mix_variant:
+        type: string
+        description: Mix/version label for this slot (e.g. "Album Mix", "Radio Edit", "Extended").
+      duration:
+        type: duration
+        description: Duration of this specific track version, if it differs from the Song's canonical duration.
+      notes:
+        type: string
+        description: Slot-specific notes (intent, sequencing rationale, etc.).
+
+  AbletonProject:
+    description: An Ableton Live project file and its associated production metadata.
+    identifiers: [file_path]
+    fields:
+      name:
+        type: string
+        required: true
+        description: Project name (usually the .als filename without extension).
+      file_path:
+        type: string
+        required: true
+        description: Absolute path to the .als file.
+      bpm:
+        type: float
+        description: Project tempo in beats per minute.
+      key:
+        type: string
+        description: Musical key (e.g. "C minor", "F# major").
+      time_signature:
+        type: string
+        description: Time signature (e.g. "4/4", "6/8").
+      ableton_version:
+        type: string
+        description: Version of Ableton Live used (e.g. "12.0.5").
+      created_at:
+        type: datetime
+        description: When the project was first created.
+      modified_at:
+        type: datetime
+        description: When the project was last saved.
+      plugins:
+        type: list
+        items: { type: string }
+        description: Names of VST/AU plugins used in the project.
+      songs:
+        type: list
+        items: { ref: Song }
+        description: Songs produced from this project (may be empty, one, or many).
+      notes:
+        type: string
+        description: Free-form production notes.
+
+  Artist:
+    description: A person or group that creates or performs music.
+    fields:
+      name:
+        type: string
+        required: true
+        description: Display name (stage name, band name, or legal name).
+      legal_name:
+        type: string
+        description: Legal name, if different from display name.
+      aliases:
+        type: list
+        items: { type: string }
+        description: Alternate names, stage names, or aka's.
+      bio:
+        type: string
+        description: Short biography or description.
+      origin:
+        type: string
+        description: City/region/country of origin.
+      urls:
+        type: list
+        items: { type: url }
+        description: Official site, socials, streaming profiles.
+
+  Exhibit:
+    description: |
+      A single HTML page hosted at a location on the site. Self-contained — one
+      file per exhibit, with the markup held inline.
+    fields:
+      title:
+        type: string
+        required: true
+        description: Display title of the exhibit.
+      location:
+        type: string
+        description: Path or slot on the site where this exhibit lives (e.g. "/garden", "/room/3").
+      html:
+        type: string
+        required: true
+        description: The HTML markup of the exhibit.
+
+  Song:
+    description: A single recorded musical work.
+    identifiers: [isrc]
+    fields:
+      title:
+        type: string
+        required: true
+        description: Display title of the song.
+      isrc:
+        type: string
+        description: International Standard Recording Code (unique identifier).
+      duration:
+        type: duration
+        description: Length of the recording (ISO 8601, e.g. PT3M42S).
+      release_date:
+        type: date
+        description: Date the song was first released.
+      artists:
+        type: list
+        items: { ref: Artist }
+        description: Performing artists credited on the song.
+      album:
+        ref: Album
+        description: Album this song appears on, if any.
+      genres:
+        type: list
+        items: { type: string }
+        description: Genre tags.
