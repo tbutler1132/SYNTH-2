@@ -1,0 +1,191 @@
+/* visor root: doesn't intercept exhibit clicks; interactive children re-enable pointer-events */
+#visor {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1000;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #e8e8e8;
+}
+.visor-bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  pointer-events: auto;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.visor-brand { font-weight: 600; }
+.visor-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 14px;
+  flex: 1;
+}
+.visor-nav a {
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.6;
+  transition: opacity 120ms ease;
+}
+.visor-nav a:hover,
+.visor-nav a[aria-current="page"] { opacity: 1; }
+.visor-device-toggle,
+.visor-device-back {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.visor-device-toggle:hover,
+.visor-device-back:hover { border-color: rgba(255, 255, 255, 0.6); }
+
+/* device — phone-like form factor */
+.visor-device {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 360px;
+  height: 540px;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.visor-device[hidden] { display: none; }
+
+.visor-device-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.visor-device-back { padding: 2px 8px; font-size: 12px; }
+.visor-device-back[hidden] { display: none; }
+.visor-device-title { flex: 1; opacity: 0.8; }
+
+.visor-device-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* app launcher */
+.visor-app-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.visor-app-tile {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: inherit;
+  font: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 11px;
+  padding: 28px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+}
+.visor-app-tile:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ontology app */
+.ontology-section {
+  margin-top: 16px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.45;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+.ontology-section:first-child { margin-top: 0; }
+.ontology-list { display: flex; flex-direction: column; }
+.ontology-item {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 8px 4px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ontology-item:hover { background: rgba(255, 255, 255, 0.04); }
+.ontology-item-name { font-size: 12px; font-weight: 600; }
+.ontology-item-desc {
+  font-size: 11px;
+  opacity: 0.55;
+  text-transform: none;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.ontology-title {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.ontology-desc {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  opacity: 0.7;
+  white-space: pre-wrap;
+}
+.ontology-kv {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 4px 12px;
+  font-size: 11px;
+}
+.ontology-kv dt {
+  opacity: 0.55;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  align-self: center;
+}
+.ontology-kv dd { margin: 0; word-break: break-word; }

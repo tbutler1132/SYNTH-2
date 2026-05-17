@@ -189,8 +189,10 @@ types:
 
   Exhibit:
     description: |
-      A single HTML page hosted at a location on the site. Self-contained — one
-      file per exhibit, with the markup held inline.
+      A single HTML page (or HTML + assets) hosted at a location on the site.
+      Self-contained and portable — the HTML itself is the artform. The canonical
+      entity here is metadata only; the actual markup lives under the top-level
+      `exhibits/` folder and is referenced via `source`.
     fields:
       title:
         type: string
@@ -198,11 +200,15 @@ types:
         description: Display title of the exhibit.
       location:
         type: string
-        description: Path or slot on the site where this exhibit lives (e.g. "/garden", "/room/3").
-      html:
+        required: true
+        description: Path or slot on the site where this exhibit lives (e.g. "/", "/garden", "/room/3").
+      source:
         type: string
         required: true
-        description: The HTML markup of the exhibit.
+        description: |
+          Path to the exhibit's HTML file, relative to the top-level `exhibits/` directory
+          (e.g. "index/index.html"). When exhibits grow to include assets, this may point
+          at any HTML file within a folder of assets co-located beside it.
 
   Song:
     description: A single recorded musical work.

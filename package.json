@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "validate": "tsx scripts/validate.ts",
-    "import:ableton": "tsx scripts/import-ableton.ts"
+    "import:ableton": "tsx scripts/import-ableton.ts",
+    "build:web": "tsx web/build.ts",
+    "preview": "tsx web/preview.ts"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
