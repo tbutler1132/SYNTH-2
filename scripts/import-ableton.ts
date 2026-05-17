@@ -12,9 +12,9 @@ const PROJECTS_DIR = path.join(ROOT, 'data', 'ableton_projects');
 const SONGS_DIR = path.join(ROOT, 'data', 'songs');
 
 // Fields on AbletonProject that this script owns and will overwrite on every run.
-// Any other frontmatter keys (e.g. notes, songs, key) are preserved across runs.
+// Any other frontmatter keys (e.g. notes, songs, key, version_label) are preserved across runs.
 const AUTO_FIELDS = [
-  'name', 'file_path', 'bpm', 'time_signature',
+  'name', 'file_path', 'parent', 'branch', 'bpm', 'time_signature',
   'ableton_version', 'modified_at', 'plugins',
 ] as const;
 
@@ -102,6 +102,15 @@ function slugify(s: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+// Split a project slug into its base (canonical song slug) and branch label.
+// `anyone-album-1` → { base: "anyone", branch: "album-1" }
+// `anyone`         → { base: "anyone", branch: "main" }
+function parseBranch(slug: string): { base: string; branch: string } {
+  const m = slug.match(/^(.*)-album-(\d+)$/);
+  if (m) return { base: m[1], branch: `album-${m[2]}` };
+  return { base: slug, branch: 'main' };
+}
+
 function songTitleFrom(projectName: string): string {
   // Strip a trailing "-Album-N" if present, then turn dashes into spaces.
   const stripped = projectName.replace(/-Album-\d+$/i, '');
@@ -124,6 +133,8 @@ function upsertAbletonProject(
   slug: string,
   extracted: ExtractedProject,
   songSlug: string,
+  branch: string,
+  parent: string | null,
 ): { created: boolean } {
   const filepath = path.join(PROJECTS_DIR, `${slug}.md`);
   let existing: Record<string, unknown> = {};
@@ -143,6 +154,8 @@ function upsertAbletonProject(
   const merged: Record<string, unknown> = {
     name: extracted.name,
     file_path: extracted.file_path,
+    ...(parent && { parent }),
+    branch,
     ...(extracted.bpm !== undefined && { bpm: extracted.bpm }),
     ...(extracted.time_signature && { time_signature: extracted.time_signature }),
     ...(extracted.ableton_version && { ableton_version: extracted.ableton_version }),
@@ -193,20 +206,23 @@ function main(): void {
     const extracted = extract(xml, alsPath, stat.mtime);
 
     const projectSlug = slugify(extracted.name);
-    const songSlug = projectSlug;
+    const { base, branch } = parseBranch(projectSlug);
+    const songSlug = base;
+    const parent = branch === 'main' ? null : base;
     const songTitle = songTitleFrom(extracted.name);
 
     const songRes = ensureSongStub(songSlug, songTitle);
     if (songRes.created) songsCreated++; else songsSkipped++;
 
-    const projRes = upsertAbletonProject(projectSlug, extracted, songSlug);
+    const projRes = upsertAbletonProject(projectSlug, extracted, songSlug, branch, parent);
     if (projRes.created) projectsCreated++; else projectsUpdated++;
 
     const plugSummary = extracted.plugins.length > 0
       ? ` plugins=${extracted.plugins.length}`
       : '';
+    const branchTag = branch === 'main' ? '' : ` [${branch}]`;
     console.log(
-      `  ${projRes.created ? '+' : '~'} ${projectSlug}` +
+      `  ${projRes.created ? '+' : '~'} ${projectSlug}${branchTag}` +
       ` (bpm=${extracted.bpm ?? '?'} ts=${extracted.time_signature ?? '?'}${plugSummary})`
     );
   }

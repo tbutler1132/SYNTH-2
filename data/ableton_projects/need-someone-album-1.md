@@ -3,6 +3,8 @@ name: Need-Someone-Album-1
 file_path: >-
   /Users/timbutler/Projects/SYNTH-2/assets/AbletonProject/Need-Someone-Album-1
   Project/Need-Someone-Album-1.als
+parent: need-someone
+branch: album-1
 bpm: 104
 time_signature: 4/4
 ableton_version: '12.4'

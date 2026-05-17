@@ -3,6 +3,8 @@ name: Stay-With-Me-Album-1
 file_path: >-
   /Users/timbutler/Projects/SYNTH-2/assets/AbletonProject/Stay-With-Me-Album-1
   Project/Stay-With-Me-Album-1.als
+parent: stay-with-me
+branch: album-1
 bpm: 91
 time_signature: 4/4
 ableton_version: '12.4'

@@ -1,14 +1,11 @@
 ---
-name: Coldness-Album-1
-file_path: >-
-  /Users/timbutler/Projects/SYNTH-2/assets/AbletonProject/Coldness-Album-1
-  Project/Coldness-Album-1.als
-parent: coldness
-branch: album-1
+name: Coldness
+file_path: /Users/timbutler/Projects/SYNTH-2/assets/AbletonProject/Coldness Project/Coldness.als
+branch: main
 bpm: 127.3
 time_signature: 4/4
 ableton_version: '12.4'
-modified_at: '2026-05-16T17:31:22Z'
+modified_at: '2026-05-17T15:37:23Z'
 plugins:
   - ADAPTIVERB
   - Auto-Tune Pro

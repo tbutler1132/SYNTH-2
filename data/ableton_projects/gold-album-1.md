@@ -1,6 +1,8 @@
 ---
 name: Gold-Album-1
 file_path: /Users/timbutler/Projects/SYNTH-2/assets/AbletonProject/Gold-Album-1 Project/Gold-Album-1.als
+parent: gold
+branch: album-1
 bpm: 115
 time_signature: 4/4
 ableton_version: '12.4'

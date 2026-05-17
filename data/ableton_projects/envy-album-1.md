@@ -1,6 +1,8 @@
 ---
 name: Envy-Album-1
 file_path: /Users/timbutler/Projects/SYNTH-2/assets/AbletonProject/Envy-Album-1-Project/Envy-Album-1.als
+parent: envy
+branch: album-1
 bpm: 109
 time_signature: 4/4
 ableton_version: '12.4'

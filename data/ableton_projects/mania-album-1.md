@@ -1,6 +1,8 @@
 ---
 name: Mania-Album-1
 file_path: /Users/timbutler/Projects/SYNTH-2/assets/AbletonProject/Mania-Album-1 Project/Mania-Album-1.als
+parent: mania
+branch: album-1
 bpm: 71
 time_signature: 4/4
 ableton_version: '12.4'
