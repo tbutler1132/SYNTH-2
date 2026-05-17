@@ -109,10 +109,10 @@ types:
 
   AbletonProject:
     description: |
-      An Ableton Live project file and its associated production metadata. Projects
-      can branch: a project may have a `parent` it was forked from and a `branch`
-      label, so different versions/experiments of the same underlying song can each
-      live as their own AbletonProject without losing the lineage between them.
+      An Ableton Live project file and its associated production metadata. Each
+      save-as is its own AbletonProject instance, linked to the version it came
+      from via `parent`. The .md file's edit history (in git) carries how thinking
+      about a given version evolved; the `parent` chain carries how versions relate.
     identifiers: [file_path]
     fields:
       name:
@@ -125,13 +125,7 @@ types:
         description: Absolute path to the .als file.
       parent:
         ref: AbletonProject
-        description: The AbletonProject this one was branched/forked from. Empty for canonical/main versions.
-      branch:
-        type: string
-        description: Branch label this version lives on (e.g. "main", "album-1", "alt-mix"). Empty implies main.
-      version_label:
-        type: string
-        description: Short human label for this specific version (e.g. "pre-master", "stripped-mix", "v2").
+        description: The AbletonProject this one was saved-as from. Empty for the original.
       bpm:
         type: float
         description: Project tempo in beats per minute.

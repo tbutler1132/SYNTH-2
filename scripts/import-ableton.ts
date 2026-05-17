@@ -9,12 +9,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const ASSETS_DIR = path.join(ROOT, 'assets', 'AbletonProject');
 const PROJECTS_DIR = path.join(ROOT, 'data', 'ableton_projects');
-const SONGS_DIR = path.join(ROOT, 'data', 'songs');
 
-// Fields on AbletonProject that this script owns and will overwrite on every run.
-// Any other frontmatter keys (e.g. notes, songs, key, version_label) are preserved across runs.
+// Fields this script owns and overwrites on every run.
+// Everything else (parent, songs, notes, key, etc.) is user-owned and preserved.
 const AUTO_FIELDS = [
-  'name', 'file_path', 'parent', 'branch', 'bpm', 'time_signature',
+  'name', 'file_path', 'bpm', 'time_signature',
   'ableton_version', 'modified_at', 'plugins',
 ] as const;
 
@@ -28,15 +27,45 @@ interface ExtractedProject {
   plugins: string[];
 }
 
-function findPrimaryAls(projectDir: string): string | null {
-  const entries = fs.readdirSync(projectDir, { withFileTypes: true });
-  const candidates = entries
-    .filter(e => e.isFile() && e.name.endsWith('.als') && !e.name.startsWith('.'))
-    .map(e => path.join(projectDir, e.name));
+interface AlsFile {
+  path: string;
+  slug: string;
+  folder: string;
+  birthtime: Date;
+  mtime: Date;
+}
+
+// Heuristic: parent = the .als in the same folder with the most recent birthtime
+// older than this one. Matches the linear save-as workflow (A → B → C, each from
+// the prior). Breaks only if you save-as from a non-latest file in the folder —
+// in which case set parent by hand in the .md. Forks to a new folder have no
+// candidate and stay empty.
+function inferParent(file: AlsFile, all: AlsFile[]): string | null {
+  const candidates = all.filter(f =>
+    f.folder === file.folder &&
+    f.path !== file.path &&
+    f.birthtime < file.birthtime
+  );
   if (candidates.length === 0) return null;
-  // Prefer the largest (live set is bigger than empty stubs)
-  candidates.sort((a, b) => fs.statSync(b).size - fs.statSync(a).size);
-  return candidates[0];
+  candidates.sort((a, b) => b.birthtime.getTime() - a.birthtime.getTime());
+  return candidates[0].slug;
+}
+
+function walkAlsFiles(root: string): string[] {
+  const out: string[] = [];
+  const visit = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith('.')) continue;
+      // Skip Ableton's auto-backup directories — they contain stale snapshots
+      // that shouldn't be ingested as their own projects.
+      if (entry.isDirectory() && entry.name === 'Backup') continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) visit(full);
+      else if (entry.isFile() && entry.name.endsWith('.als')) out.push(full);
+    }
+  };
+  visit(root);
+  return out;
 }
 
 function decodeTimeSignature(value: number): string {
@@ -102,23 +131,7 @@ function slugify(s: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-// Split a project slug into its base (canonical song slug) and branch label.
-// `anyone-album-1` → { base: "anyone", branch: "album-1" }
-// `anyone`         → { base: "anyone", branch: "main" }
-function parseBranch(slug: string): { base: string; branch: string } {
-  const m = slug.match(/^(.*)-album-(\d+)$/);
-  if (m) return { base: m[1], branch: `album-${m[2]}` };
-  return { base: slug, branch: 'main' };
-}
-
-function songTitleFrom(projectName: string): string {
-  // Strip a trailing "-Album-N" if present, then turn dashes into spaces.
-  const stripped = projectName.replace(/-Album-\d+$/i, '');
-  return stripped.replace(/-/g, ' ').trim();
-}
-
 function writeYamlFrontmatter(data: Record<string, unknown>, body = ''): string {
-  // Preserve key order; strip undefined/null/empty arrays.
   const clean: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) {
     if (v === undefined || v === null) continue;
@@ -132,10 +145,8 @@ function writeYamlFrontmatter(data: Record<string, unknown>, body = ''): string 
 function upsertAbletonProject(
   slug: string,
   extracted: ExtractedProject,
-  songSlug: string,
-  branch: string,
-  parent: string | null,
-): { created: boolean } {
+  parentCandidate: string | null,
+): { created: boolean; parentSet: boolean } {
   const filepath = path.join(PROJECTS_DIR, `${slug}.md`);
   let existing: Record<string, unknown> = {};
   let body = '';
@@ -151,11 +162,16 @@ function upsertAbletonProject(
     delete existing[f];
   }
 
+  // Only infer parent on first creation. Once the .md exists, parent is user-owned
+  // and we never touch it — manual overrides are safe across reruns.
+  const parentSet = created && parentCandidate !== null && existing.parent === undefined;
+  if (parentSet) {
+    existing = { parent: parentCandidate, ...existing };
+  }
+
   const merged: Record<string, unknown> = {
     name: extracted.name,
     file_path: extracted.file_path,
-    ...(parent && { parent }),
-    branch,
     ...(extracted.bpm !== undefined && { bpm: extracted.bpm }),
     ...(extracted.time_signature && { time_signature: extracted.time_signature }),
     ...(extracted.ableton_version && { ableton_version: extracted.ableton_version }),
@@ -164,20 +180,8 @@ function upsertAbletonProject(
     ...existing,
   };
 
-  const existingSongs = Array.isArray(existing.songs) ? (existing.songs as string[]) : [];
-  if (!existingSongs.includes(songSlug)) {
-    merged.songs = [...existingSongs, songSlug];
-  }
-
   fs.writeFileSync(filepath, writeYamlFrontmatter(merged, body));
-  return { created };
-}
-
-function ensureSongStub(slug: string, title: string): { created: boolean } {
-  const filepath = path.join(SONGS_DIR, `${slug}.md`);
-  if (fs.existsSync(filepath)) return { created: false };
-  fs.writeFileSync(filepath, writeYamlFrontmatter({ title }));
-  return { created: true };
+  return { created, parentSet };
 }
 
 function main(): void {
@@ -186,52 +190,65 @@ function main(): void {
     process.exit(1);
   }
   fs.mkdirSync(PROJECTS_DIR, { recursive: true });
-  fs.mkdirSync(SONGS_DIR, { recursive: true });
 
-  const projectDirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true })
-    .filter(e => e.isDirectory())
-    .map(e => path.join(ASSETS_DIR, e.name));
+  const alsPaths = walkAlsFiles(ASSETS_DIR);
+  if (alsPaths.length === 0) {
+    console.log('No .als files found.');
+    return;
+  }
 
-  let projectsCreated = 0, projectsUpdated = 0, songsCreated = 0, songsSkipped = 0;
+  // Build the index up front so parent inference can see all siblings at once.
+  const alsFiles: AlsFile[] = alsPaths.map(p => {
+    const stat = fs.statSync(p);
+    return {
+      path: p,
+      slug: slugify(path.basename(p, '.als')),
+      folder: path.dirname(p),
+      birthtime: stat.birthtime,
+      mtime: stat.mtime,
+    };
+  });
 
-  for (const dir of projectDirs) {
-    const alsPath = findPrimaryAls(dir);
-    if (!alsPath) {
-      console.warn(`  skip ${path.basename(dir)} — no .als file`);
-      continue;
+  // Two .als files anywhere in the tree with the same basename would map to the
+  // same AbletonProject .md. Warn instead of silently overwriting.
+  const slugSources = new Map<string, string[]>();
+  for (const f of alsFiles) {
+    const arr = slugSources.get(f.slug) ?? [];
+    arr.push(f.path);
+    slugSources.set(f.slug, arr);
+  }
+  for (const [slug, sources] of slugSources) {
+    if (sources.length > 1) {
+      console.warn(`  ! slug collision "${slug}":`);
+      for (const s of sources) console.warn(`      ${s}`);
     }
-    const compressed = fs.readFileSync(alsPath);
+  }
+
+  let projectsCreated = 0, projectsUpdated = 0;
+
+  for (const file of alsFiles) {
+    const compressed = fs.readFileSync(file.path);
     const xml = zlib.gunzipSync(compressed).toString('utf8');
-    const stat = fs.statSync(alsPath);
-    const extracted = extract(xml, alsPath, stat.mtime);
+    const extracted = extract(xml, file.path, file.mtime);
 
-    const projectSlug = slugify(extracted.name);
-    const { base, branch } = parseBranch(projectSlug);
-    const songSlug = base;
-    const parent = branch === 'main' ? null : base;
-    const songTitle = songTitleFrom(extracted.name);
-
-    const songRes = ensureSongStub(songSlug, songTitle);
-    if (songRes.created) songsCreated++; else songsSkipped++;
-
-    const projRes = upsertAbletonProject(projectSlug, extracted, songSlug, branch, parent);
-    if (projRes.created) projectsCreated++; else projectsUpdated++;
+    const parentCandidate = inferParent(file, alsFiles);
+    const res = upsertAbletonProject(file.slug, extracted, parentCandidate);
+    if (res.created) projectsCreated++; else projectsUpdated++;
 
     const plugSummary = extracted.plugins.length > 0
       ? ` plugins=${extracted.plugins.length}`
       : '';
-    const branchTag = branch === 'main' ? '' : ` [${branch}]`;
+    const parentTag = res.parentSet ? ` parent=${parentCandidate}` : '';
     console.log(
-      `  ${projRes.created ? '+' : '~'} ${projectSlug}${branchTag}` +
-      ` (bpm=${extracted.bpm ?? '?'} ts=${extracted.time_signature ?? '?'}${plugSummary})`
+      `  ${res.created ? '+' : '~'} ${file.slug}` +
+      ` (bpm=${extracted.bpm ?? '?'} ts=${extracted.time_signature ?? '?'}${plugSummary}${parentTag})`
     );
   }
 
   console.log(
     `\nAbletonProject: ${projectsCreated} created, ${projectsUpdated} updated` +
-    `\nSong stubs: ${songsCreated} created, ${songsSkipped} already existed` +
-    `\n\nAlbum stubs were NOT auto-created — album-to-song mapping is a creative call.` +
-    ` Add Albums and AlbumTracks by hand in data/albums/ and data/album_tracks/.`
+    `\n\nNote: parent is inferred once on creation from sibling .als birthtimes.` +
+    ` After that, parent and other non-extracted fields are preserved — edit by hand if needed.`
   );
 }
 
