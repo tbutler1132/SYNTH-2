@@ -1,78 +1,27 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import yaml from 'js-yaml';
-import matter from 'gray-matter';
-
-interface FieldSpec {
-  type?: string;
-  description?: string;
-  required?: boolean;
-  default?: unknown;
-  enum?: unknown[];
-  items?: FieldSpec;
-  ref?: string;
-}
-
-interface TypeSpec {
-  description: string;
-  fields: Record<string, FieldSpec>;
-  identifiers?: string[];
-  extends?: string;
-  examples?: unknown;
-}
-
-interface Ontology {
-  meta: unknown;
-  types: Record<string, TypeSpec>;
-}
+import {
+  type FieldSpec,
+  type TypeSpec,
+  type Instance,
+  loadOntology,
+  loadInstances,
+  toFolderName,
+} from './lib/ontology';
 
 const PRIMITIVE_TYPES = new Set([
   'string', 'integer', 'float', 'boolean', 'date', 'datetime', 'duration', 'url',
 ]);
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '..');
-const DATA_DIR = path.join(ROOT, 'data');
-const ONTOLOGY_PATH = path.join(ROOT, 'ontology.yaml');
-
-function toFolderName(typeName: string): string {
-  const snake = typeName.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
-  if (/(s|x|sh|ch)$/.test(snake)) return snake + 'es';
-  if (/[bcdfghjklmnpqrstvwxz]y$/.test(snake)) return snake.slice(0, -1) + 'ies';
-  return snake + 's';
-}
-
-interface Instance {
-  data: Record<string, unknown>;
-  file: string;
-}
-
-function loadOntology(): Ontology {
-  const raw = fs.readFileSync(ONTOLOGY_PATH, 'utf8');
-  return yaml.load(raw) as Ontology;
-}
-
-function loadInstances(types: Record<string, TypeSpec>): Record<string, Map<string, Instance>> {
-  const instances: Record<string, Map<string, Instance>> = {};
-  for (const typeName of Object.keys(types)) {
-    const folder = path.join(DATA_DIR, toFolderName(typeName));
-    instances[typeName] = new Map();
-    if (!fs.existsSync(folder)) continue;
-    for (const filename of fs.readdirSync(folder)) {
-      if (!filename.endsWith('.md')) continue;
-      const slug = filename.slice(0, -3);
-      const filepath = path.join(folder, filename);
-      const parsed = matter(fs.readFileSync(filepath, 'utf8'));
-      instances[typeName].set(slug, { data: parsed.data, file: filepath });
-    }
-  }
-  return instances;
-}
-
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/;
 const ISO_DURATION = /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/;
+
+function loadAllInstances(types: Record<string, TypeSpec>): Record<string, Map<string, Instance>> {
+  const out: Record<string, Map<string, Instance>> = {};
+  for (const typeName of Object.keys(types)) {
+    out[typeName] = new Map(loadInstances(typeName).map(i => [i.slug, i]));
+  }
+  return out;
+}
 
 function validateValue(
   value: unknown,
@@ -158,7 +107,7 @@ function validateValue(
 function validate(): void {
   const ontology = loadOntology();
   const types = ontology.types;
-  const instances = loadInstances(types);
+  const instances = loadAllInstances(types);
   const errors: string[] = [];
   let instanceCount = 0;
 
